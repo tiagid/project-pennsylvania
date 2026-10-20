@@ -1,5 +1,6 @@
 import os
 import tempfile
+import librosa
 
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import Response
@@ -9,6 +10,7 @@ from backend.transcribe import audio_to_midi
 app = FastAPI()
 
 ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
+MAX_SECONDS = 180
 
 @app.get("/health")
 def health():
@@ -26,6 +28,15 @@ def transcribe(file: UploadFile):
         audio_path = os.path.join(tmp, "upload" + ext)
         with open(audio_path, "wb") as f:
             f.write(file.file.read())
+
+        #check length
+        try:
+            seconds = librosa.get_duration(path=audio_path)
+        except Exception:
+            raise HTTPException(400, "couldn't read that file, try recording it again")
+
+        if seconds > MAX_SECONDS:
+            raise HTTPException(400, "clips have to be 3 minutes or less")
 
         midi_path = os.path.join(tmp, "out.mid")
         audio_to_midi(audio_path, midi_path)

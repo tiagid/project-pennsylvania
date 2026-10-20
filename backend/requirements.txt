@@ -2,3 +2,6 @@ fastapi
 uvicorn
 pretty_midi
 pytest
+basic-pitch
+python-multipart
+numpy<2

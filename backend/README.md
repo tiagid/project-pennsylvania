@@ -1,6 +1,6 @@
 # Backend
 
-Python 3.12 transcription pipeline and FastAPI service. Owned by Brady.
+Python 3.10 transcription pipeline and FastAPI service. Owned by Brady.
 
 Pipeline: load audio (ffmpeg, librosa), find notes (basic-pitch), guess tempo (librosa), write MIDI (pretty_midi). The FastAPI app exposes POST /transcribe.
 

@@ -1,5 +1,6 @@
 import os
 import tempfile
+from urllib.parse import quote
 import librosa
 
 from fastapi import FastAPI, UploadFile, HTTPException
@@ -44,4 +45,9 @@ def transcribe(file: UploadFile):
         with open(midi_path, "rb") as f:
             data = f.read()
 
-    return Response(data, media_type="audio/midi")
+    #tells the browser its a file to download and names it after the upload
+    name = os.path.splitext(file.filename)[0] + ".mid"
+    #headers can only be plain ascii, iphone names can have stuff like ’ so the full name goes in filename*
+    plain = name.encode("ascii", "ignore").decode().replace('"', "")
+    disposition = f"attachment; filename=\"{plain}\"; filename*=UTF-8''{quote(name)}"
+    return Response(data, media_type="audio/midi", headers={"Content-Disposition": disposition})

@@ -5,10 +5,21 @@ import librosa
 
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.transcribe import audio_to_midi
 
 app = FastAPI()
+
+#browsers block the site from calling us unless we list it here, add vincents vercel url once he has one
+ORIGINS = ["http://localhost:5173"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ORIGINS,
+    allow_methods = ["GET", "POST"],
+    allow_headers = ["*"],
+    expose_headers = ["Content-Disposition"],
+)
 
 ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
 MAX_SECONDS = 180

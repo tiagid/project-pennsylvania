@@ -1,9 +1,13 @@
+import { supabase } from "./supabase";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, options);
   if (!response.ok) {
-    const message = await response.text().catch(() => "");
+    //our server sends errors as {"detail": "..."} so pull out just the message
+    const body = await response.json().catch(() => ({}));
+    const message = typeof body.detail === "string" ? body.detail : "";
     throw new Error(message || `Request failed (${response.status})`);
   }
   return response;
@@ -37,26 +41,19 @@ export async function transcribeAudio(file, token) {
   };
 }
 
+//login and signup go straight to supabase, our python server doesnt handle accounts
 export async function login(email, password) {
-  if (!API_BASE_URL) {
-    return { token: "demo-token", user: { email } };
-  }
-  const response = await request("/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  return response.json();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  return { token: data.session.access_token, user: data.user };
 }
 
 export async function register(email, password) {
-  if (!API_BASE_URL) {
-    return { token: "demo-token", user: { email } };
-  }
-  const response = await request("/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  return response.json();
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  return { token: data.session?.access_token, user: data.user };
+}
+
+export async function logout() {
+  await supabase.auth.signOut();
 }

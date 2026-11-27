@@ -27,6 +27,7 @@ app.add_middleware(
 
 ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
 MAX_SECONDS = 180
+MAX_BYTES = 25 * 1024 * 1024  #a 3 min voice memo is only a couple MB so 25 is plenty
 SECS_PER_SEC = 0.6  #on render a 3 min clip took about 107 sec, so about 0.6 sec of work per sec of audio
 
 #basic-pitch uses a lot of memory and render only gives us 512 MB, so one clip at a time
@@ -43,15 +44,20 @@ def check_upload(file, tmp):
     if ext not in ALLOWED:
         raise HTTPException(400, "only WAV, MP3, and M4A files work")
 
+    #only read 1 byte past the limit so a huge file cant fill up our 512 MB
+    data = file.file.read(MAX_BYTES + 1)
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, "that file is too big, keep it under 25 MB")
+
     audio_path = os.path.join(tmp, "upload" + ext)
     with open(audio_path, "wb") as f:
-        f.write(file.file.read())
+        f.write(data)
 
     #check length
     try:
         seconds = librosa.get_duration(path=audio_path)
-    except Exception:
-        raise HTTPException(400, "couldn't read that file, try recording it again")
+    except Exception as err:
+        raise HTTPException(400, "couldn't read that file, try recording it again") from err
 
     if seconds > MAX_SECONDS:
         raise HTTPException(400, "clips have to be 3 minutes or less")

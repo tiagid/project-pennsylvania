@@ -12,5 +12,13 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend backend
 
+#save numba's compiled code in the image so it doesnt recompile every time render wakes up
+ENV NUMBA_CACHE_DIR=/app/.numba_cache
+RUN python -m backend.warm_up
+
+#run as a normal user instead of root so a hacked server cant take over the container
+RUN useradd --create-home app && chown -R app /app
+USER app
+
 #render gives us the port in $PORT
 CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}

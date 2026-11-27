@@ -5,3 +5,4 @@ pytest
 basic-pitch
 python-multipart
 numpy<2
+httpx

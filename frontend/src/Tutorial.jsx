@@ -16,6 +16,7 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [bpm, setBpm] = useState(null);
   const clock = useRef({ t: -LEAD_IN, last: 0, played: new Set() });  //song time in seconds and which notes already made a sound
   const audio = useRef(null);
   const piano = useRef(null);
@@ -25,7 +26,11 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
   useEffect(() => {
     fetch(midiUrl)
       .then((r) => r.arrayBuffer())
-      .then((buf) => setNotes(new Midi(buf).tracks.flatMap((t) => t.notes)))
+      .then((buf) => {
+        const midi = new Midi(buf);
+        setBpm(Math.round(midi.header.tempos[0]?.bpm || 120));  //the server writes the tempo it guessed into the file
+        setNotes(midi.tracks.flatMap((t) => t.notes));
+      })
       .catch(() => setNotes([]));
   }, [midiUrl]);
 
@@ -149,7 +154,7 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
     <div className="tutorial">
       <header className="tutorial-bar">
         <button onClick={onBack} type="button"><ArrowLeft size={18}/> Back</button>
-        <span>{filename}</span>
+        <span>{filename}{bpm && ` · ${Math.round(bpm * speed)} BPM`}</span>
         <div>
           <button onClick={togglePlay} type="button" disabled={!notes?.length}>{playing ? <Pause size={18}/> : <Play size={18}/>}</button>
           <button onClick={restart} type="button"><RotateCcw size={18}/></button>

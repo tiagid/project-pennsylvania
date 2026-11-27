@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Music2, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
-import { login, register, transcribeAudio } from "./api";
+import { login, register, transcribeAudio, logout as signOut } from "./api";
 
 
 function PhoneShell({ children, title, subtitle }) {
@@ -189,6 +189,7 @@ function App() {
   }
 
   function logout() {
+    if (session?.token) signOut();
     setSession(null); setResult(null); setSourceFile(null); setError(""); setView("login");
   }
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
-import { Music2, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
-import { login, register, transcribeAudio } from "./api";
+import { Music2, Piano, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
+import { login, register, transcribeAudio, logout as signOut } from "./api";
+import Tutorial from "./Tutorial";
 
 
 function PhoneShell({ children, title, subtitle }) {
@@ -68,7 +69,7 @@ function LoginPage({ onSubmit, loading, error, onSkip }) {
 
 
 
-function UploadPage({ onUpload, processing, error, onLogout, userEmail }) {
+function UploadPage({ onUpload, processing, progress, error, onLogout, userEmail }) {
   const [file, setFile] = useState(null);
   const picker = useRef(null);
 
@@ -107,8 +108,9 @@ function UploadPage({ onUpload, processing, error, onLogout, userEmail }) {
         )}
         {error && <p className="error">{error}</p>}
         <button className="primary convert-button" disabled={!file || processing} onClick={() => onUpload(file)} type="button">
-          <AudioLines size={19}/>{processing ? "Finding notes…" : "Convert to MIDI"}
+          <AudioLines size={19}/>{processing ? `Finding notes… ${progress}%` : "Convert to MIDI"}
         </button>
+        {processing && <div className="progress"><div style={{ width: `${progress}%` }} /></div>}
 
         <div className="process-strip">
           <span>1. Upload</span><span>2. Detect notes</span><span>3. Download MIDI</span>
@@ -125,7 +127,7 @@ function UploadPage({ onUpload, processing, error, onLogout, userEmail }) {
 
 
 
-function ResultPage({ result, sourceFile, onAgain }) {
+function ResultPage({ result, sourceFile, onAgain, onTutorial }) {
   return (
     <PhoneShell title="Your MIDI is ready" subtitle="The audio has been processed and your MIDI file is ready to save.">
       <section className="card result-card">
@@ -141,6 +143,9 @@ function ResultPage({ result, sourceFile, onAgain }) {
           </div>
         )}
 
+        <button className="primary tutorial-button" onClick={onTutorial} type="button">
+          <Piano size={19}/> Synthesia piano tutorial
+        </button>
         <a className="primary download" href={result.midiUrl} download={result.filename}>
           <Download size={19}/> Download MIDI
         </a>
@@ -158,6 +163,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [sourceFile, setSourceFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
   async function handleAuth({ email, password, mode }) {
@@ -172,7 +178,7 @@ function App() {
   }
 
   async function handleUpload(file) {
-    setLoading(true); setError(""); setSourceFile(file);
+    setLoading(true); setError(""); setSourceFile(file); setProgress(0);
     try {
       if (!import.meta.env.VITE_API_BASE_URL) {
         // Demo mode lets the frontend workflow be shown before the API URL is connected.
@@ -180,7 +186,7 @@ function App() {
         const demoBlob = new Blob([new Uint8Array([77,84,104,100,0,0,0,6,0,0,0,1,0,96,77,84,114,107,0,0,0,12,0,0x90,60,100,0x60,0x80,60,0,0,0xFF,0x2F,0])], { type: "audio/midi" });
         setResult({ midiUrl: URL.createObjectURL(demoBlob), filename: `${file.name.replace(/\.[^.]+$/, "")}.mid`, notes: 1, demo: true });
       } else {
-        setResult(await transcribeAudio(file, session?.token));
+        setResult(await transcribeAudio(file, session?.token, setProgress));
       }
       setView("result");
     } catch (e) {
@@ -189,11 +195,13 @@ function App() {
   }
 
   function logout() {
+    if (session?.token) signOut();
     setSession(null); setResult(null); setSourceFile(null); setError(""); setView("login");
   }
 
-  if (view === "result") return <ResultPage result={result} sourceFile={sourceFile} onAgain={() => { if (result?.midiUrl?.startsWith("blob:")) URL.revokeObjectURL(result.midiUrl); setResult(null); setSourceFile(null); setView("upload"); }} />;
-  if (view === "upload") return <UploadPage onUpload={handleUpload} processing={loading} error={error} onLogout={logout} userEmail={session?.email} />;
+  if (view === "tutorial") return <Tutorial midiUrl={result.midiUrl} filename={result.filename} onBack={() => setView("result")} />;
+  if (view === "result") return <ResultPage result={result} sourceFile={sourceFile} onTutorial={() => setView("tutorial")} onAgain={() => { if (result?.midiUrl?.startsWith("blob:")) URL.revokeObjectURL(result.midiUrl); setResult(null); setSourceFile(null); setView("upload"); }} />;
+  if (view === "upload") return <UploadPage onUpload={handleUpload} processing={loading} progress={progress} error={error} onLogout={logout} userEmail={session?.email} />;
   return <LoginPage onSubmit={handleAuth} loading={loading} error={error} onSkip={() => { setSession({ email: "Demo session" }); setView("upload"); }} />;
 }
 

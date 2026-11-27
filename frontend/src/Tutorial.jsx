@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Midi } from "@tonejs/midi";
+import { SplendidGrandPiano } from "smplr";
 import { ArrowLeft, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 
 //US-5: synthesia style tutorial, notes fall onto a keyboard and hit the key right when they should be played
@@ -17,6 +18,7 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
   const [muted, setMuted] = useState(false);
   const clock = useRef({ t: -LEAD_IN, last: 0, played: new Set() });  //song time in seconds and which notes already made a sound
   const audio = useRef(null);
+  const piano = useRef(null);
   const settings = useRef({ speed, muted });
   settings.current = { speed, muted };
 
@@ -27,16 +29,20 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
       .catch(() => setNotes([]));
   }, [midiUrl]);
 
-  //simple built in synth so you hear each note when it hits
+  //plays a real grand piano sample when each note hits, if the samples didnt load it falls back to a soft sine tone
   function beep(n) {
     const ctx = audio.current;
     if (!ctx || settings.current.muted) return;
+    const len = Math.max(n.duration / settings.current.speed, 0.1);
+    if (piano.current) {
+      piano.current.start({ note: n.midi, velocity: 80, duration: len });  //80 so it uses the samples we loaded
+      return;
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const len = Math.max(n.duration / settings.current.speed, 0.1);
-    osc.type = "triangle";
     osc.frequency.value = 440 * Math.pow(2, (n.midi - 69) / 12);
-    gain.gain.setValueAtTime(0.2 * n.velocity, ctx.currentTime);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.25 * n.velocity, ctx.currentTime + 0.01);  //quick fade in so it doesnt click
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + len);
     osc.connect(gain).connect(ctx.destination);
     osc.start();
@@ -123,7 +129,14 @@ export default function Tutorial({ midiUrl, filename, onBack }) {
 
   function togglePlay() {
     //browsers only allow sound after a tap, so the synth starts here
-    if (!audio.current) audio.current = new AudioContext();
+    if (!audio.current) {
+      audio.current = new AudioContext();
+      //only download the keys this song uses at one loudness, the whole piano is 200+ files which is a lot on a phone
+      const p = SplendidGrandPiano(audio.current, {
+        notesToLoad: { notes: [...new Set(notes.map((n) => n.midi))], velocityRange: [70, 90], fallback: "nearest" },
+      });
+      p.load.then(() => { piano.current = p; }).catch(() => {});  //samples download the first time you hit play
+    }
     clock.current.last = 0;
     setPlaying(!playing);
   }

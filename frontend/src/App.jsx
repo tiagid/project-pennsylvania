@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Music2, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
 import { login, register, transcribeAudio, logout as signOut } from "./api";
+import PianoRoll from "./PianoRoll";
 
 
 function PhoneShell({ children, title, subtitle }) {
@@ -140,6 +141,8 @@ function ResultPage({ result, sourceFile, onAgain }) {
             <span>notes detected</span>
           </div>
         )}
+
+        <PianoRoll midiUrl={result.midiUrl} />
 
         <a className="primary download" href={result.midiUrl} download={result.filename}>
           <Download size={19}/> Download MIDI

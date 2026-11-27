@@ -70,3 +70,5 @@ input { width: 100%; border: 0; outline: 0; padding: 13px 0; color: var(--ink); 
   .app-bg { padding: 0; background: var(--paper); }
   .phone-shell { width: 100%; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
 }
+.piano-roll { margin: 16px 0; padding: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.piano-roll span { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); text-align: center; }

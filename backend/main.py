@@ -7,7 +7,7 @@ import uuid
 from urllib.parse import quote
 import librosa
 
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Form
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,7 +22,7 @@ app.add_middleware(
     allow_origins = ORIGINS,
     allow_methods = ["GET", "POST"],
     allow_headers = ["*"],
-    expose_headers = ["Content-Disposition"],
+    expose_headers = ["Content-Disposition", "X-BPM"],
 )
 
 ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
@@ -57,36 +57,42 @@ def check_upload(file, tmp):
         raise HTTPException(400, "clips have to be 3 minutes or less")
     return audio_path, seconds
 
-def midi_download(data, filename):
+def check_bpm(bpm):
+    if bpm is not None and not 40 <= bpm <= 240:
+        raise HTTPException(400, "tempo has to be between 40 and 240 BPM")
+
+def midi_download(data, filename, bpm):
     #tells the browser its a file to download and names it after the upload
     name = os.path.splitext(filename)[0] + ".mid"
     #headers can only be plain ascii, iphone names can have stuff like ’ so the full name goes in filename*
     plain = name.encode("ascii", "ignore").decode().replace('"', "")
     disposition = f"attachment; filename=\"{plain}\"; filename*=UTF-8''{quote(name)}"
-    return Response(data, media_type="audio/midi", headers={"Content-Disposition": disposition})
+    #X-BPM lets the page show what tempo we used
+    return Response(data, media_type="audio/midi", headers={"Content-Disposition": disposition, "X-BPM": str(bpm)})
 
 @app.post("/transcribe")
-def transcribe(file: UploadFile):
+def transcribe(file: UploadFile, bpm: int | None = Form(None)):
+    check_bpm(bpm)
     #temp folder will delete itself when its done
     with tempfile.TemporaryDirectory() as tmp:
         audio_path, _ = check_upload(file, tmp)
         midi_path = os.path.join(tmp, "out.mid")
         with lock:
-            audio_to_midi(audio_path, midi_path)
+            bpm = audio_to_midi(audio_path, midi_path, bpm)
 
         with open(midi_path, "rb") as f:
             data = f.read()
-    return midi_download(data, file.filename)
+    return midi_download(data, file.filename, bpm)
 
 #progress bar version: upload gives back a job id right away, then the page asks /status every couple seconds
-def run_job(job_id, tmp, audio_path):
+def run_job(job_id, tmp, audio_path, bpm):
     job = jobs[job_id]
     with lock:
         job["state"] = "working"
         job["started"] = time.time()
         try:
             midi_path = os.path.join(tmp, "out.mid")
-            audio_to_midi(audio_path, midi_path)
+            job["bpm"] = audio_to_midi(audio_path, midi_path, bpm)
             with open(midi_path, "rb") as f:
                 job["midi"] = f.read()
             job["state"] = "done"
@@ -96,7 +102,8 @@ def run_job(job_id, tmp, audio_path):
             shutil.rmtree(tmp, ignore_errors=True)
 
 @app.post("/jobs")
-def start_job(file: UploadFile, background: BackgroundTasks):
+def start_job(file: UploadFile, background: BackgroundTasks, bpm: int | None = Form(None)):
+    check_bpm(bpm)
     tmp = tempfile.mkdtemp()  #not a with block since the job keeps using it after we respond
     try:
         audio_path, seconds = check_upload(file, tmp)
@@ -106,7 +113,7 @@ def start_job(file: UploadFile, background: BackgroundTasks):
 
     job_id = uuid.uuid4().hex
     jobs[job_id] = {"state": "waiting", "estimate": seconds * SECS_PER_SEC + 2, "name": file.filename}
-    background.add_task(run_job, job_id, tmp, audio_path)
+    background.add_task(run_job, job_id, tmp, audio_path, bpm)
     return {"job_id": job_id}
 
 @app.get("/status/{job_id}")
@@ -121,7 +128,7 @@ def status(job_id: str):
         percent = min(95, int(100 * (time.time() - job["started"]) / job["estimate"]))
     elif job["state"] == "done":
         percent = 100
-    return {"state": job["state"], "percent": percent}
+    return {"state": job["state"], "percent": percent, "bpm": job.get("bpm")}
 
 @app.get("/result/{job_id}")
 def result(job_id: str):
@@ -129,4 +136,4 @@ def result(job_id: str):
     if not job or job["state"] != "done":
         raise HTTPException(404, "that MIDI isn't ready yet")
     jobs.pop(job_id)  #done with it so it doesnt sit in memory
-    return midi_download(job["midi"], job["name"])
+    return midi_download(job["midi"], job["name"], job["bpm"])

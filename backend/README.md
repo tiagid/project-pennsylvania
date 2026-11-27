@@ -11,7 +11,7 @@ Run tests with pytest backend/tests from the repo root.
 ## Endpoints
 
 - GET /health: returns {"ok": true}, use it to wake the server up
-- POST /transcribe: send the audio as "file" (WAV, MP3, or M4A, 3 min and 25 MB max) and get the .mid back. The tempo it used comes back in the X-BPM header
+- POST /transcribe: send the audio as "file" (WAV, MP3, M4A, WEBM, or OGG, 3 min and 25 MB max) and get the .mid back. The tempo it used comes back in the X-BPM header
 - POST /jobs: same upload, but gives back {"job_id": "..."} right away so the page can show a progress bar
 - GET /status/{job_id}: {"state": "waiting" | "working" | "done" | "failed", "percent": 0 to 100, "bpm": 120}. Ask every couple seconds
 - GET /result/{job_id}: the .mid once state is done (works once, then the job is cleared)

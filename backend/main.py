@@ -25,7 +25,7 @@ app.add_middleware(
     expose_headers = ["Content-Disposition", "X-BPM"],
 )
 
-ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
+ALLOWED = {".wav", ".mp3", ".m4a", ".webm", ".ogg"}  #m4a is iphone voice memos, webm and ogg are what chrome and android save when you record in the browser
 MAX_SECONDS = 180
 MAX_BYTES = 25 * 1024 * 1024  #a 3 min voice memo is only a couple MB so 25 is plenty
 SECS_PER_SEC = 0.6  #starting guess from render (3 min clip took about 107 sec), each finished job updates it
@@ -42,7 +42,7 @@ def health():
 def check_upload(file, tmp):
     ext = os.path.splitext(file.filename)[1].lower()  #file extension like wav
     if ext not in ALLOWED:
-        raise HTTPException(400, "only WAV, MP3, and M4A files work")
+        raise HTTPException(400, "only WAV, MP3, M4A, WEBM, and OGG files work")
 
     #only read 1 byte past the limit so a huge file cant fill up our 512 MB
     data = file.file.read(MAX_BYTES + 1)

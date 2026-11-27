@@ -1,3 +1,5 @@
+import shutil
+import subprocess
 import time
 
 import numpy as np
@@ -39,7 +41,7 @@ def test_wrong_file_type_is_rejected(tmp_path):
     txt.write_text("not audio")
     r = upload("/jobs", txt)
     assert r.status_code == 400
-    assert r.json()["detail"] == "only WAV, MP3, and M4A files work"
+    assert r.json()["detail"] == "only WAV, MP3, M4A, WEBM, and OGG files work"
 
 
 def test_file_over_25_mb_is_rejected(tmp_path, monkeypatch):
@@ -87,3 +89,14 @@ def test_progress_estimate_learns_from_finished_jobs(tmp_path, monkeypatch):
             break
         time.sleep(1)
     assert main.SECS_PER_SEC < 100.0
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="needs ffmpeg to make the test clip")
+@pytest.mark.parametrize("ext, codec", [(".webm", "libopus"), (".ogg", "libvorbis")])
+def test_browser_mic_recordings_work(tmp_path, ext, codec):
+    #chrome records the mic as webm, so make one the same way and send it through
+    clip = tmp_path / ("mic" + ext)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", codec, str(clip)], check=True)
+    r = upload("/transcribe", clip)
+    assert r.status_code == 200
+    assert r.content[:4] == b"MThd"

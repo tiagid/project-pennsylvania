@@ -77,3 +77,13 @@ def test_unknown_job_is_404():
 @pytest.mark.parametrize("bpm", [90, 140])
 def test_guess_tempo_finds_the_beat(tmp_path, bpm):
     assert abs(guess_tempo(clicks(tmp_path / "clicks.wav", bpm)) - bpm) <= 6
+
+
+def test_progress_estimate_learns_from_finished_jobs(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "SECS_PER_SEC", 100.0)  #way too slow on purpose so we can see it come down
+    job_id = upload("/jobs", tone(tmp_path / "a4.wav")).json()["job_id"]
+    for _ in range(60):
+        if client.get(f"/status/{job_id}").json()["state"] == "done":
+            break
+        time.sleep(1)
+    assert main.SECS_PER_SEC < 100.0

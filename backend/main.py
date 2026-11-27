@@ -28,7 +28,7 @@ app.add_middleware(
 ALLOWED = {".wav", ".mp3", ".m4a"}  #m4a is what the iphone voice memos save as
 MAX_SECONDS = 180
 MAX_BYTES = 25 * 1024 * 1024  #a 3 min voice memo is only a couple MB so 25 is plenty
-SECS_PER_SEC = 0.6  #on render a 3 min clip took about 107 sec, so about 0.6 sec of work per sec of audio
+SECS_PER_SEC = 0.6  #starting guess from render (3 min clip took about 107 sec), each finished job updates it
 
 #basic-pitch uses a lot of memory and render only gives us 512 MB, so one clip at a time
 lock = threading.Lock()
@@ -92,6 +92,7 @@ def transcribe(file: UploadFile, bpm: int | None = Form(None)):
 
 #progress bar version: upload gives back a job id right away, then the page asks /status every couple seconds
 def run_job(job_id, tmp, audio_path, bpm):
+    global SECS_PER_SEC
     job = jobs[job_id]
     with lock:
         job["state"] = "working"
@@ -102,6 +103,9 @@ def run_job(job_id, tmp, audio_path, bpm):
             with open(midi_path, "rb") as f:
                 job["midi"] = f.read()
             job["state"] = "done"
+            #learn how fast this machine really is so the next progress bar is more accurate
+            took = (time.time() - job["started"]) / job["seconds"]
+            SECS_PER_SEC = 0.25 * SECS_PER_SEC + 0.75 * took  #mostly trust the newest job but keep a little of the old guess so one weird clip doesnt throw it off
         except Exception:
             job["state"] = "failed"
         finally:
@@ -118,7 +122,7 @@ def start_job(file: UploadFile, background: BackgroundTasks, bpm: int | None = F
         raise
 
     job_id = uuid.uuid4().hex
-    jobs[job_id] = {"state": "waiting", "estimate": seconds * SECS_PER_SEC + 2, "name": file.filename}
+    jobs[job_id] = {"state": "waiting", "seconds": seconds, "estimate": seconds * SECS_PER_SEC + 1, "name": file.filename}
     background.add_task(run_job, job_id, tmp, audio_path, bpm)
     return {"job_id": job_id}
 

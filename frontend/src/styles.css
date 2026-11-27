@@ -80,3 +80,5 @@ input { width: 100%; border: 0; outline: 0; padding: 13px 0; color: var(--ink); 
 .tutorial-empty { text-align: center; padding: 20px; }
 .rotate-hint { display: none; margin: 0; padding: 6px; text-align: center; font-size: 12px; color: #aaa; }
 @media (orientation: portrait) { .rotate-hint { display: block; } }
+.progress { height: 10px; margin-top: 12px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.progress div { height: 100%; background: var(--accent); transition: width .6s ease; }

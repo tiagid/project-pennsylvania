@@ -13,26 +13,29 @@ async function request(path, options = {}) {
   return response;
 }
 
-export async function transcribeAudio(file, token) {
+export async function transcribeAudio(file, token, onProgress) {
   const body = new FormData();
   body.append("file", file);
 
-  const response = await request("/transcribe", {
+  //server gives back a job id right away, then we ask how far along it is every 2 seconds for the progress bar
+  const job = await request("/jobs", {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body,
   });
+  const { job_id } = await job.json();
 
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    const payload = await response.json();
-    return {
-      midiUrl: payload.midi_url || payload.download_url || payload.url,
-      filename: payload.filename || `${file.name.replace(/\.[^.]+$/, "")}.mid`,
-      notes: payload.notes || null,
-    };
+  const giveUp = Date.now() + 5 * 60 * 1000;  //so the page never sits frozen forever
+  while (true) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const status = await (await request(`/status/${job_id}`)).json();
+    onProgress?.(status.percent);
+    if (status.state === "done") break;
+    if (status.state === "failed") throw new Error("Couldn't convert that file, try recording it again.");
+    if (Date.now() > giveUp) throw new Error("This is taking too long, please try again.");
   }
 
+  const response = await request(`/result/${job_id}`);
   const blob = await response.blob();
   return {
     midiUrl: URL.createObjectURL(blob),

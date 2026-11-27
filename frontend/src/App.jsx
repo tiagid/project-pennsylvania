@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
-import { Music2, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
+import { Music2, Piano, ArrowRight, LockKeyhole, Mail, CheckCircle2, Download, RotateCcw, AudioLines, FileAudio, LogOut, UploadCloud, X } from "lucide-react";
 import { login, register, transcribeAudio, logout as signOut } from "./api";
+import Tutorial from "./Tutorial";
 
 
 function PhoneShell({ children, title, subtitle }) {
@@ -126,7 +127,7 @@ function UploadPage({ onUpload, processing, progress, error, onLogout, userEmail
 
 
 
-function ResultPage({ result, sourceFile, onAgain }) {
+function ResultPage({ result, sourceFile, onAgain, onTutorial }) {
   return (
     <PhoneShell title="Your MIDI is ready" subtitle="The audio has been processed and your MIDI file is ready to save.">
       <section className="card result-card">
@@ -142,6 +143,9 @@ function ResultPage({ result, sourceFile, onAgain }) {
           </div>
         )}
 
+        <button className="primary tutorial-button" onClick={onTutorial} type="button">
+          <Piano size={19}/> Synthesia piano tutorial
+        </button>
         <a className="primary download" href={result.midiUrl} download={result.filename}>
           <Download size={19}/> Download MIDI
         </a>
@@ -195,7 +199,8 @@ function App() {
     setSession(null); setResult(null); setSourceFile(null); setError(""); setView("login");
   }
 
-  if (view === "result") return <ResultPage result={result} sourceFile={sourceFile} onAgain={() => { if (result?.midiUrl?.startsWith("blob:")) URL.revokeObjectURL(result.midiUrl); setResult(null); setSourceFile(null); setView("upload"); }} />;
+  if (view === "tutorial") return <Tutorial midiUrl={result.midiUrl} filename={result.filename} onBack={() => setView("result")} />;
+  if (view === "result") return <ResultPage result={result} sourceFile={sourceFile} onTutorial={() => setView("tutorial")} onAgain={() => { if (result?.midiUrl?.startsWith("blob:")) URL.revokeObjectURL(result.midiUrl); setResult(null); setSourceFile(null); setView("upload"); }} />;
   if (view === "upload") return <UploadPage onUpload={handleUpload} processing={loading} progress={progress} error={error} onLogout={logout} userEmail={session?.email} />;
   return <LoginPage onSubmit={handleAuth} loading={loading} error={error} onSkip={() => { setSession({ email: "Demo session" }); setView("upload"); }} />;
 }
